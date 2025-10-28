@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Availability Planner</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  td {
+    min-width: 50px;
+    height: 40px;
+    position: relative;
+  }
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-6">
+
+<h1 class="text-3xl font-bold mb-4">Availability Planner</h1>
+
+<div id="setup" class="mb-6">
+  <input id="nameInput" type="text" placeholder="Enter your name" class="border p-1 rounded mr-2">
+  <input id="color1" type="color" value="#ff0000" class="mr-1">
+  <input id="color2" type="color" value="#0000ff" class="mr-1">
+  <button id="startBtn" class="bg-blue-500 text-white px-2 py-1 rounded">Start</button>
+</div>
+
+<div id="gridContainer" class="overflow-x-auto hidden"></div>
+
+<script>
+// STORAGE
+let gridData = JSON.parse(localStorage.getItem('gridData') || "{}");
+let userData = JSON.parse(localStorage.getItem('userData') || "{}");
+let userName, colorStart, colorEnd;
+
+// DAYS
+const days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const defaultTimes = Array.from({length: 15}, (_,i) => {
+  let hour = 8 + i;
+  let period = hour >= 12 ? "PM" : "AM";
+  let displayHour = hour > 12 ? hour - 12 : hour;
+  return `${displayHour} ${period}`;
+});
+
+// CHECK IF A USER IS ALREADY SAVED
+if(userData && Object.keys(userData).length > 0){
+    const savedName = Object.keys(userData)[0];
+    userName = savedName;
+    colorStart = userData[savedName].colorStart;
+    colorEnd = userData[savedName].colorEnd;
+    document.getElementById('setup').style.display = 'none';
+    buildGrid();
+} else {
+    // No saved user: show setup section
+    document.getElementById('setup').style.display = 'block';
+}
+
+// START BUTTON
+document.getElementById('startBtn').onclick = () => {
+    userName = document.getElementById('nameInput').value.trim();
+    if(!userName){ alert("Please enter a name"); return; }
+    colorStart = document.getElementById('color1').value;
+    colorEnd = document.getElementById('color2').value;
+    userData[userName] = {colorStart,colorEnd};
+    localStorage.setItem('userData', JSON.stringify(userData));
+    document.getElementById('setup').style.display = 'none';
+    buildGrid();
+}
+
+// BUILD GRID
+function buildGrid(){
+    const container = document.getElementById('gridContainer');
+    container.innerHTML = "";
+    container.classList.remove('hidden');
+    const table = document.createElement('table');
+    table.className = "border-collapse";
+
+    // header
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    headRow.innerHTML = "<th class='border p-2 bg-gray-100'></th>" + days.map(d=>`<th class='border p-2 bg-gray-100'>${d}</th>`).join('');
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    // body
+    const tbody = document.createElement('tbody');
+    defaultTimes.forEach(time=>{
+        const row = document.createElement('tr');
+        row.innerHTML = `<td class='border px-2 py-1 font-medium bg-gray-50 text-center'>${time}</td>`;
+        days.forEach(day=>{
+            const cell = document.createElement('td');
+            cell.className = "border cursor-pointer p-0";
+
+            // CLICK TO TOGGLE
+            cell.onclick = ()=>{
+                const key = `${day}_${time}`;
+                gridData[key] = gridData[key]||[];
+                const idx = gridData[key].indexOf(userName);
+                if(idx === -1) gridData[key].push(userName);
+                else gridData[key].splice(idx,1);
+                localStorage.setItem('gridData', JSON.stringify(gridData));
+                updateCell(cell,key);
+            }
+
+            // HOVER TO SHOW NAMES
+            cell.onmouseenter = ()=>{
+                const key = `${day}_${time}`;
+                const names = gridData[key]||[];
+                cell.title = names.length > 0 ? names.join(", ") : "";
+            }
+
+            updateCell(cell,`${day}_${time}`);
+            row.appendChild(cell);
+        });
+        tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+}
+
+// UPDATE CELL COLOR WITH DIVIDED SLICES
+function updateCell(cell,key){
+    const names = gridData[key]||[];
+    cell.innerHTML = "";
+    if(names.length === 0){
+        cell.style.background = "";
+        return;
+    }
+
+    cell.style.display = "flex";
+    cell.style.flexDirection = "row";
+    cell.style.padding = "0";
+
+    names.forEach(n=>{
+        const c = userData[n] || {colorStart:"#ff0000", colorEnd:"#0000ff"};
+        const slice = document.createElement("div");
+        slice.style.flex = "1"; // equal width
+        slice.style.height = "100%";
+        slice.style.background = `linear-gradient(45deg, ${c.colorStart}, ${c.colorEnd})`;
+        cell.appendChild(slice);
+    });
+}
+</script>
+
+</body>
+</html>
+
